@@ -81,7 +81,8 @@ fun SettingsScreen(vm: HvacViewModel, onBack: () -> Unit) {
                     SilkLabel("红外桥", color = Ink.SilkDim)
                     Spacer(Modifier.height(10.dp))
                     Text(
-                        "app 只负责算出 38 kHz 波形，发射交给红外桥。新加的红外室内机默认用这个地址。",
+                        "app 只负责算出 38 kHz 波形，通过 Wi-Fi 交给红外桥发射。" +
+                            "新加的红外室内机默认用这个地址。",
                         style = PanelType.body,
                         color = Ink.SilkDim,
                     )
@@ -93,15 +94,15 @@ fun SettingsScreen(vm: HvacViewModel, onBack: () -> Unit) {
                         placeholder = "http://192.168.1.50",
                     )
                     Spacer(Modifier.height(12.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        SilkLabel("手机红外口", small = true, color = Ink.SilkDim)
-                        Spacer(Modifier.width(10.dp))
-                        Text(
-                            if (vm.controller.phoneHasIrEmitter()) "有" else "没有",
-                            style = PanelType.silkSmall,
-                            color = if (vm.controller.phoneHasIrEmitter()) Ink.Live else Ink.SilkDim,
-                        )
-                    }
+                    Text(
+                        if (vm.controller.phoneHasIrEmitter()) {
+                            "这台手机自带红外口，红外室内机不填地址时会用它发。"
+                        } else {
+                            "这台手机没有红外口，不影响用红外——发射由红外桥完成。"
+                        },
+                        style = PanelType.body,
+                        color = Ink.SilkDim,
+                    )
                 }
             }
 

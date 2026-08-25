@@ -33,8 +33,8 @@ android {
         applicationId = "com.hvacpanel"
         minSdk = 24
         targetSdk = 37
-        versionCode = 2
-        versionName = "1.0.1"
+        versionCode = 3
+        versionName = "1.0.2"
 
         // Where the in-app updater looks for newer builds.
         buildConfigField("String", "UPDATE_REPO", "\"adgry/central-ac-remote\"")

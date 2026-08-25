@@ -482,7 +482,8 @@ private fun LinkFooter(unit: AcUnit, sending: Boolean, onTuneIr: () -> Unit) {
     val (kind, detail) = when (val l = unit.link) {
         Link.Demo -> "演示" to "本机模拟，不发任何指令"
         is Link.GreeLan -> "局域网" to "${l.host} · ${l.mac.takeLast(6)}${if (l.key == null) " · 未绑定" else ""}"
-        is Link.Infrared -> "红外" to (l.bridgeUrl?.let { "经红外桥 $it" } ?: "用手机红外口发射")
+        is Link.Infrared -> "红外" to
+            (l.bridgeUrl?.let { "经红外桥 $it" } ?: "没填红外桥地址，只能用手机红外口")
     }
     PanelSurface(Modifier.fillMaxWidth(), sunk = true) {
         Column(Modifier.padding(14.dp)) {

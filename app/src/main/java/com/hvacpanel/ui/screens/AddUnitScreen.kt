@@ -63,7 +63,7 @@ fun AddUnitScreen(vm: HvacViewModel, onBack: () -> Unit) {
             // -------------------------------------------------------- Infrared
             Block(
                 title = "红外",
-                body = "线控器上那个小黑点是红外接收窗，可以像遥控器那样对它发码。手机基本都没有红外口了，所以要一台红外桥（ESP8266/ESP32 + 红外灯，固件在 docs/ir-bridge.ino），放在线控器附近。\n\n加完之后进这台机器的「红外调试」页，可以当场验证线控器认不认。",
+                body = "线控器上那个小黑点是红外接收窗，可以像遥控器那样对它发码。\n\n发射不靠手机：app 只算波形，通过 Wi-Fi 交给一台红外桥（ESP8266/ESP32 + 红外灯，固件在 docs/ir-bridge.ino），桥放在线控器附近对准那个小黑点。手机有没有红外口都不影响。\n\n加完之后进这台机器的「红外调试」页，可以当场验证线控器认不认。",
             ) {
                 PanelField(
                     value = bridge,
@@ -85,13 +85,18 @@ fun AddUnitScreen(vm: HvacViewModel, onBack: () -> Unit) {
                     ) {
                         Text("添加红外室内机", style = PanelType.silk, color = Ink.Silk)
                     }
-                    Spacer(Modifier.width(12.dp))
-                    SilkLabel(
-                        if (vm.controller.phoneHasIrEmitter()) "这台手机有红外口" else "这台手机没有红外口",
-                        small = true,
-                        color = if (vm.controller.phoneHasIrEmitter()) Ink.Live else Ink.SilkFaint,
-                    )
                 }
+                Spacer(Modifier.height(10.dp))
+                // Say what it means for the user, not just whether the part exists.
+                Text(
+                    if (vm.controller.phoneHasIrEmitter()) {
+                        "这台手机自带红外口，地址留空就用它发。"
+                    } else {
+                        "这台手机没有红外口——不影响，发射由上面那台红外桥完成。"
+                    },
+                    style = PanelType.body,
+                    color = Ink.SilkDim,
+                )
             }
 
             // ------------------------------------------------------------ Demo
