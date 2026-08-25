@@ -24,8 +24,16 @@ jobs:
 
       - uses: android-actions/setup-android@v3
 
+      # API 37 ships as a minor-versioned platform, so the package id is
+      # "android-37.0", not "android-37". Tolerant on purpose: if the id changes
+      # again, AGP can still fetch the platform itself, and the listing below
+      # makes a failure diagnosable instead of mysterious.
       - name: Install the SDK pieces this project needs
-        run: sdkmanager "platforms;android-37" "build-tools;37.0.0"
+        run: |
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+          sdkmanager "build-tools;37.0.0" || true
+          sdkmanager "platforms;android-37.0" || sdkmanager "platforms;android-37" || true
+          sdkmanager --list_installed | grep -E "platforms|build-tools" || true
 
       - name: Restore the signing keystore
         env:
