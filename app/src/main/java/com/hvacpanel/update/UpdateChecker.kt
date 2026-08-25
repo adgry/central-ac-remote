@@ -179,11 +179,19 @@ class UpdateChecker(private val context: Context) {
         }
     }
 
-    /** Numeric-segment comparison, so 1.10.0 beats 1.9.0 and v-prefixes are fine. */
-    internal fun isNewer(remoteTag: String, localVersion: String): Boolean {
-        fun parts(v: String) = v.trim().removePrefix("v").removePrefix("V")
-            .split('.', '-', '+')
-            .mapNotNull { seg -> seg.takeWhile(Char::isDigit).toIntOrNull() }
+    private fun isNewer(remoteTag: String, localVersion: String) =
+        VersionCompare.isNewer(remoteTag, localVersion)
+}
+
+/**
+ * Whether a release tag names a version later than the one running.
+ *
+ * Kept separate and pure because it is the only thing standing between a
+ * re-tagged old commit and a silent downgrade on the phone.
+ */
+object VersionCompare {
+
+    fun isNewer(remoteTag: String, localVersion: String): Boolean {
         val remote = parts(remoteTag)
         val local = parts(localVersion)
         if (remote.isEmpty()) return false
@@ -194,4 +202,9 @@ class UpdateChecker(private val context: Context) {
         }
         return false
     }
+
+    private fun parts(v: String): List<Int> =
+        v.trim().removePrefix("v").removePrefix("V")
+            .split('.', '-', '+')
+            .mapNotNull { seg -> seg.takeWhile(Char::isDigit).toIntOrNull() }
 }
