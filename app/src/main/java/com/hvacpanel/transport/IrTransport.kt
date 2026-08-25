@@ -6,11 +6,17 @@ import com.hvacpanel.model.AcState
 import com.hvacpanel.model.AcUnit
 import com.hvacpanel.model.Link
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.net.HttpURLConnection
+import java.net.Inet4Address
+import java.net.NetworkInterface
 import java.net.URL
 
 /**
@@ -44,13 +50,89 @@ class IrTransport(private val context: Context) : Transport {
     override suspend fun write(unit: AcUnit, desired: AcState): AcState {
         val link = unit.link as? Link.Infrared ?: throw TransportException("链路不是红外")
         val pattern = GreeIrEncoder.waveform(desired)
-        val bridge = link.bridgeUrl?.trim()
+        val bridge = link.bridgeUrl?.let(::normalizeUrl)
         if (!bridge.isNullOrEmpty()) {
             sendViaBridge(bridge, pattern, repeat = 2)
         } else {
             sendViaPhone(pattern)
         }
         return desired
+    }
+
+    // ----------------------------------------------------------- addresses
+
+    companion object {
+        /** What the bridge sketch calls itself in its status JSON. */
+        const val BRIDGE_ID = "hvacpanel-ir-bridge"
+
+        /**
+         * Accepts what people actually type. A bare address gets http://, and a
+         * pasted endpoint path is trimmed back to the base — otherwise the
+         * connection test would GET /send and be told 405 by our own bridge.
+         */
+        fun normalizeUrl(input: String): String {
+            var url = input.trim()
+            if (url.isEmpty()) return ""
+            if (!url.contains("://")) url = "http://$url"
+            url = url.trimEnd('/')
+            for (suffix in listOf("/send", "/capture")) {
+                if (url.endsWith(suffix)) url = url.dropLast(suffix.length).trimEnd('/')
+            }
+            return url
+        }
+    }
+
+    /**
+     * Sweeps every /24 this phone is on, looking for the bridge. Saves the owner
+     * from digging the address out of a router admin page: the bridge names
+     * itself in its status JSON, so a hit is unambiguous.
+     */
+    suspend fun discoverBridges(perHostTimeoutMs: Int = 500): List<String> = coroutineScope {
+        val candidates = localSubnetHosts()
+        if (candidates.isEmpty()) return@coroutineScope emptyList()
+        @OptIn(ExperimentalCoroutinesApi::class)
+        val net = Dispatchers.IO.limitedParallelism(40)
+        candidates.map { host ->
+            async(net) { if (looksLikeBridge(host, perHostTimeoutMs)) "http://$host" else null }
+        }.awaitAll().filterNotNull()
+    }
+
+    /** Every address on the same /24 as this phone, minus its own. */
+    private fun localSubnetHosts(): List<String> {
+        val hosts = ArrayList<String>(254)
+        runCatching {
+            for (nif in NetworkInterface.getNetworkInterfaces()) {
+                if (!nif.isUp || nif.isLoopback) continue
+                for (addr in nif.interfaceAddresses) {
+                    val ip = addr.address as? Inet4Address ?: continue
+                    if (addr.networkPrefixLength < 24) continue // too big to sweep
+                    val parts = ip.hostAddress?.split('.') ?: continue
+                    if (parts.size != 4) continue
+                    val prefix = parts.take(3).joinToString(".")
+                    val own = parts[3].toIntOrNull() ?: continue
+                    for (last in 1..254) if (last != own) hosts.add("$prefix.$last")
+                }
+            }
+        }
+        return hosts.distinct()
+    }
+
+    private fun looksLikeBridge(host: String, timeoutMs: Int): Boolean {
+        val conn = runCatching {
+            URL("http://$host/").openConnection() as HttpURLConnection
+        }.getOrNull() ?: return false
+        return try {
+            conn.connectTimeout = timeoutMs
+            conn.readTimeout = timeoutMs
+            conn.requestMethod = "GET"
+            if (conn.responseCode !in 200..299) return false
+            val body = conn.inputStream.bufferedReader().use(BufferedReader::readText)
+            JSONObject(body).optString("device") == BRIDGE_ID
+        } catch (_: Exception) {
+            false
+        } finally {
+            runCatching { conn.disconnect() }
+        }
     }
 
     // -------------------------------------------------------------- diagnostics
@@ -61,7 +143,7 @@ class IrTransport(private val context: Context) : Transport {
 
     /** Is the bridge there, and what does it say about itself? */
     suspend fun probeBridge(bridgeUrl: String): String = withContext(Dispatchers.IO) {
-        val url = bridgeUrl.trimEnd('/')
+        val url = normalizeUrl(bridgeUrl)
         val conn = try {
             URL(url).openConnection() as HttpURLConnection
         } catch (e: Exception) {
@@ -95,7 +177,7 @@ class IrTransport(private val context: Context) : Transport {
      */
     suspend fun capture(bridgeUrl: String, timeoutMs: Int = 10_000): IntArray =
         withContext(Dispatchers.IO) {
-            val url = bridgeUrl.trimEnd('/') + "/capture?timeout=" + timeoutMs
+            val url = normalizeUrl(bridgeUrl) + "/capture?timeout=" + timeoutMs
             val conn = try {
                 URL(url).openConnection() as HttpURLConnection
             } catch (e: Exception) {
@@ -145,7 +227,7 @@ class IrTransport(private val context: Context) : Transport {
         pattern: IntArray,
         repeat: Int = 1,
     ) = withContext(Dispatchers.IO) {
-        val url = if (baseUrl.endsWith("/send")) baseUrl else baseUrl.trimEnd('/') + "/send"
+        val url = normalizeUrl(baseUrl) + "/send"
         val body = JSONObject().apply {
             put("carrier", GreeIrEncoder.CARRIER_HZ)
             put("raw", JSONArray(pattern.toList()))

@@ -88,11 +88,42 @@ fun IrTuneScreen(vm: HvacViewModel, unitId: String, onBack: () -> Unit) {
                 Row {
                     PanelKey(
                         onClick = {
+                            run("搜索") {
+                                vm.controller.findBridges().map { found ->
+                                    when {
+                                        found.isEmpty() ->
+                                            "没搜到红外桥。确认它通电了、和手机连同一个 Wi-Fi。"
+                                        else -> {
+                                            bridge = found.first()
+                                            vm.controller.setBridgeUrl(unitId, found.first())
+                                            if (found.size == 1) {
+                                                "找到 ${found.first()}，已填好"
+                                            } else {
+                                                "找到 ${found.size} 台，填了第一台 ${found.first()}"
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        enabled = working == null,
+                        accent = Ink.Cool,
+                        contentPadding = 15.dp,
+                    ) {
+                        Text(
+                            if (working == "搜索") "搜索中…" else "搜索红外桥",
+                            style = PanelType.silkSmall,
+                            color = Ink.Silk,
+                        )
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    PanelKey(
+                        onClick = {
                             vm.controller.setBridgeUrl(unitId, bridge)
                             vm.controller.notify("地址已保存")
                         },
                         contentPadding = 15.dp,
-                    ) { Text("保存地址", style = PanelType.silkSmall, color = Ink.Silk) }
+                    ) { Text("保存", style = PanelType.silkSmall, color = Ink.Silk) }
                     Spacer(Modifier.width(8.dp))
                     PanelKey(
                         onClick = {
@@ -103,7 +134,7 @@ fun IrTuneScreen(vm: HvacViewModel, unitId: String, onBack: () -> Unit) {
                         },
                         enabled = working == null && bridge.isNotBlank(),
                         contentPadding = 15.dp,
-                    ) { Text("连接测试", style = PanelType.silkSmall, color = Ink.Silk) }
+                    ) { Text("测试", style = PanelType.silkSmall, color = Ink.Silk) }
                 }
             }
 

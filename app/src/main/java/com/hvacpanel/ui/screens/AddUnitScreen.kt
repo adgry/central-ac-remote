@@ -15,6 +15,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +29,7 @@ import com.hvacpanel.ui.components.PanelSurface
 import com.hvacpanel.ui.components.SilkLabel
 import com.hvacpanel.ui.theme.Ink
 import com.hvacpanel.ui.theme.PanelType
+import kotlinx.coroutines.launch
 
 /**
  * Adding a unit means choosing how the app will reach it. The three ways are
@@ -42,6 +44,8 @@ fun AddUnitScreen(vm: HvacViewModel, onBack: () -> Unit) {
     var room by remember { mutableStateOf(prefs.defaultRoom) }
     var manualName by remember { mutableStateOf("") }
     var bridge by remember { mutableStateOf(prefs.bridgeUrl) }
+    var scanningBridge by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
 
     PanelScreen(title = "添加室内机", eyebrow = "选一种连接方式", onBack = onBack) {
         Column(
@@ -72,6 +76,43 @@ fun AddUnitScreen(vm: HvacViewModel, onBack: () -> Unit) {
                     placeholder = "http://192.168.1.50",
                 )
                 Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    PanelKey(
+                        onClick = {
+                            if (scanningBridge) return@PanelKey
+                            scanningBridge = true
+                            scope.launch {
+                                val found = vm.controller.findBridges().getOrDefault(emptyList())
+                                if (found.isNotEmpty()) {
+                                    bridge = found.first()
+                                    prefs.bridgeUrl = found.first()
+                                    vm.controller.notify("找到 ${found.first()}，已填好")
+                                } else {
+                                    vm.controller.notify(
+                                        "没搜到红外桥。确认它通电了、和手机连同一个 Wi-Fi。",
+                                    )
+                                }
+                                scanningBridge = false
+                            }
+                        },
+                        enabled = !scanningBridge,
+                        accent = Ink.Cool,
+                        contentPadding = 15.dp,
+                    ) {
+                        Text(
+                            if (scanningBridge) "搜索中…" else "搜索红外桥",
+                            style = PanelType.silkSmall,
+                            color = Ink.Silk,
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Text(
+                        "不知道地址就点这个",
+                        style = PanelType.body,
+                        color = Ink.SilkDim,
+                    )
+                }
+                Spacer(Modifier.height(14.dp))
                 PanelField(manualName, { manualName = it }, "名称", placeholder = "客厅")
                 Spacer(Modifier.height(14.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {

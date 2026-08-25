@@ -147,7 +147,9 @@ class AcController(
                 id = "ir-${UUID.randomUUID().toString().take(6)}",
                 name = name.ifBlank { "室内机" },
                 room = room,
-                link = Link.Infrared(bridgeUrl?.trim()?.ifBlank { null }),
+                link = Link.Infrared(
+                    IrTransport.normalizeUrl(bridgeUrl.orEmpty()).ifBlank { null },
+                ),
                 reach = Reachability.UNKNOWN,
             ),
         )
@@ -207,10 +209,16 @@ class AcController(
 
     /** Change which bridge a unit sends through. */
     fun setBridgeUrl(id: String, url: String) {
+        val clean = IrTransport.normalizeUrl(url)
         patch(id) { u ->
             val link = u.link as? Link.Infrared ?: return@patch u
-            u.copy(link = link.copy(bridgeUrl = url.trim().ifBlank { null }))
+            u.copy(link = link.copy(bridgeUrl = clean.ifBlank { null }))
         }
+    }
+
+    /** Sweep the local network for infrared bridges. */
+    suspend fun findBridges(): Result<List<String>> = runCatching {
+        infrared.discoverBridges()
     }
 
     private fun bridgeOf(unit: AcUnit): String =
