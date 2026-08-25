@@ -110,6 +110,9 @@ adb install -r app/build/outputs/apk/debug/app-debug.apk
 
 keystore 和它的密码**丢了就再也没法更新已装的 app**，只能卸载重装。备份好。
 
+> 换签名要卸载一次：如果手机上装的是早期的 debug 包，签名和 release 包不一样，
+> 装不上去。先卸载再装 v1.0.0 或更新的 release 包，之后应用内更新就一路顺了。
+
 ### 发一个版本
 
 ```bash
