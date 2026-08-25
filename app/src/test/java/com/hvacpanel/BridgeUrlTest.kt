@@ -1,7 +1,10 @@
 package com.hvacpanel
 
+import com.hvacpanel.transport.IrTransport.Companion.isBridgeStatus
 import com.hvacpanel.transport.IrTransport.Companion.normalizeUrl
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -46,5 +49,34 @@ class BridgeUrlTest {
     fun `empty stays empty`() {
         assertEquals("", normalizeUrl(""))
         assertEquals("", normalizeUrl("   "))
+    }
+}
+
+/**
+ * The network sweep knocks on port 80 of every address on the subnet, so a
+ * printer, a router admin page or a camera will all answer. Only our bridge
+ * names itself.
+ */
+class BridgeIdentityTest {
+
+    @Test
+    fun `our bridge is recognised`() {
+        assertTrue(
+            isBridgeStatus("""{"ok":true,"device":"hvacpanel-ir-bridge","ip":"192.168.1.50"}"""),
+        )
+    }
+
+    @Test
+    fun `some other device on port 80 is not`() {
+        assertFalse(isBridgeStatus("""{"device":"printer"}"""))
+        assertFalse(isBridgeStatus("""{"ok":true}"""))
+        assertFalse(isBridgeStatus("""{"device":"hvacpanel-ir-bridge-ish"}"""))
+    }
+
+    @Test
+    fun `a page that is not json is not a bridge`() {
+        assertFalse(isBridgeStatus("<html><title>Router</title></html>"))
+        assertFalse(isBridgeStatus(""))
+        assertFalse(isBridgeStatus("hvacpanel-ir-bridge"))
     }
 }

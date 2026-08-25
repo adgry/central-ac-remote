@@ -80,6 +80,14 @@ class IrTransport(private val context: Context) : Transport {
             }
             return url
         }
+
+        /**
+         * Whether a status body came from our bridge. Pulled out of the network
+         * sweep so the part that can be got wrong — deciding that some random
+         * device on port 80 is the bridge — is testable without hardware.
+         */
+        fun isBridgeStatus(body: String): Boolean =
+            runCatching { JSONObject(body).optString("device") == BRIDGE_ID }.getOrDefault(false)
     }
 
     /**
@@ -127,7 +135,7 @@ class IrTransport(private val context: Context) : Transport {
             conn.requestMethod = "GET"
             if (conn.responseCode !in 200..299) return false
             val body = conn.inputStream.bufferedReader().use(BufferedReader::readText)
-            JSONObject(body).optString("device") == BRIDGE_ID
+            isBridgeStatus(body)
         } catch (_: Exception) {
             false
         } finally {
